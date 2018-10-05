@@ -121,6 +121,9 @@ int get_priority(char ch) {
         case '/':
             result = 2;
             break;
+        case '~':
+            result = 3;
+            break;
         case '(':
             result = -1;
             break;
@@ -130,8 +133,8 @@ int get_priority(char ch) {
     return result;
 }
 
-/* Выполняем операцию */
-double action(double a, char operator, double b, _Bool *success) {
+/* Выполняем операцию бинарную */
+double action_bin(double a, char operator, double b, _Bool *success) {
     double result = 0;
     switch (operator) {
         case '+':
@@ -157,8 +160,20 @@ double action(double a, char operator, double b, _Bool *success) {
     return result;
 }
 
+/* Выполняем операцию унарную */
+double action_un(char operator, double b, _Bool *success) {
+    double result = 0;
+    if (operator == '~') {
+        result = -b;
+    } else {
+        (*success) = 0;
+    }
+    return result;
+}
+
+
 /* Вычисляем со стека */
-int calc(struct node **operators, struct node_digit **digits) {
+_Bool calc(struct node **operators, struct node_digit **digits) {
     _Bool success = 1;
     char operator;
     double digit_1, digit_2, result;
@@ -167,13 +182,16 @@ int calc(struct node **operators, struct node_digit **digits) {
     }
     *operators = pop(*operators, &operator);
     *digits = pop_digit(*digits, &digit_2);
-    if (empty_digit(*digits)) {
-        return 0;
+    if (operator != '~') {
+        if (empty_digit(*digits)) {
+            return 0;
+        }
+        *digits = pop_digit(*digits, &digit_1);
+
+        result = action_bin(digit_1, operator, digit_2, &success);
+    } else {
+        result = action_un(operator, digit_2, &success);
     }
-    *digits = pop_digit(*digits, &digit_1);
-
-    result = action(digit_1, operator, digit_2, &success);
-
     if (!success) {
         return 0;
     }
@@ -182,7 +200,7 @@ int calc(struct node **operators, struct node_digit **digits) {
 }
 
 /* Чистим память */
-void down(struct node **operators, struct node_digit **digits, char ** digit) {
+void down(struct node **operators, struct node_digit **digits, char **digit) {
     free(*digit);
     *operators = clear(*operators);
     *digits = clear_digit(*digits);
@@ -190,13 +208,76 @@ void down(struct node **operators, struct node_digit **digits, char ** digit) {
     free(*operators);
 }
 
+/* Очередь для сбора больших чисел FIFO */
+struct node_q
+{
+    char data;
+    struct node_q *next;
+};
+typedef struct node_q node_q;
+
+struct queue
+{
+    int count;
+    node_q *front;
+    node_q *rear;
+};
+typedef struct queue queue;
+
+void initialize(queue *q)
+{
+    q->count = 0;
+    q->front = NULL;
+    q->rear = NULL;
+}
+
+int isempty_queue(queue *q)
+{
+    return (q->rear == NULL);
+}
+
+void enqueue(queue *q, char value)
+{
+    node_q *tmp;
+    tmp = malloc(sizeof(node_q));
+    tmp->data = value;
+    tmp->next = NULL;
+    if(!isempty_queue(q))
+    {
+        q->rear->next = tmp;
+        q->rear = tmp;
+    }
+    else
+    {
+        q->front = q->rear = tmp;
+    }
+    q->count++;
+}
+
+int dequeue(queue *q)
+{
+    node_q *tmp;
+    char n = q->front->data;
+    tmp = q->front;
+    q->front = q->front->next;
+    q->count--;
+    free(tmp);
+    return(n);
+}
+
+
+
+
 
 int main() {
+    char old_ch=' ';
     char ch, current_operator; // текущий символ строки
+    _Bool in_begin = 1;
     int priority = 0, current_priority = 0;
+    size_t MAX = 50;
     struct node *operators = NULL; // стек операторов
     struct node_digit *digits = NULL; // стек чисел
-    char *digit = (char *) malloc(100 * sizeof(char)); // собираем большие числа тип 12324.43242 по символам
+    char *digit = (char *) malloc(MAX * sizeof(char)+1); // собираем большие числа тип 12324.43242 по символам
     int idx = 0; // кол-во цифр в числе
 
     do {
@@ -205,9 +286,18 @@ int main() {
         if (ch == ' ') {
             continue;
         }
+        /* Выявялем унарный минус */
+        if ((ch == '-' && in_begin) || (old_ch == '(' && ch == '-')) {
+            ch = '~';
+        }
+        in_begin = 0;
+        old_ch = ch;
         /* Собираем большое число тип 12234.4342 */
         if (ch == '.' || (ch >= 48 && ch <= 57)) {
-
+            if (idx >= MAX) {
+                printf("[error]");
+                return 0;
+            }
             digit[idx] = ch;
             idx++;
             continue;
@@ -219,7 +309,8 @@ int main() {
             digits = push_digit(digits, element);
             idx = 0;
             free(digit);
-            digit = (char *) malloc(100 * sizeof(char));
+            digit = NULL;
+            digit = (char *) malloc(MAX * sizeof(char)+1);
         }
 
         if (empty(operators) || ch == '(') {
@@ -244,7 +335,7 @@ int main() {
             continue;
         }
         /* Если ввод выражения закончен */
-        if (ch == '\n') {
+        if (ch == '\n' || ch == '\0' || ch==EOF) {
             /* вычисляем что осталось в стеке пока операции не закончатся */
             while (!empty(operators)) {
                 if (!calc(&operators, &digits)) {
@@ -288,7 +379,7 @@ int main() {
                 }
             }
         } while (1);
-    } while (ch != EOF && ch != '\n');
+    } while (ch != '\n' && ch != '\0' && ch!=EOF);
 
     double result;
     digits = pop_digit(digits, &result);

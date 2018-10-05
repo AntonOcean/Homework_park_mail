@@ -1,5 +1,4 @@
 /*
-    RunID: 649
     Составить программу определения такого максимального подотрезка среди элементов заданного целочисленного массива,
     элементы которого увеличиваются по порядку на 1.
 */
@@ -50,16 +49,15 @@ struct node *clear(struct node *head) {
 /* Смотрим последний элемент */
 int peek(struct node *head) {
     if (empty(head)) {
-        printf("[error]");
-        return 0;
+        exit(0);
     }
     return head->data;
 }
 
-/* Находит максимальный подотрезок и возвращает его длину, а сам отрезок через указатель-параметр */
-int solve(int arr[], int N, struct node **max) {
+/* Ищем максимальный подотрезок и возвращает его длину, а сам отрезок через указатель-параметр */
+size_t find_max_arr(const int arr[], size_t N, struct node **max) {
     struct node *buf = NULL;
-    int size_buf = 1, size_max = 0;
+    size_t size_buf = 1, size_max = 0;
     int current_buf;
     buf = push(buf, arr[0]);
 
@@ -86,6 +84,7 @@ int solve(int arr[], int N, struct node **max) {
             size_buf = 1;
         }
     }
+
     /* Если вся последовательность возрастала */
     if (size_max < size_buf) {
         *max = clear(*max);
@@ -96,6 +95,7 @@ int solve(int arr[], int N, struct node **max) {
             *max = push(*max, element);
         }
     }
+
     /* Если ничего не нашли */
     if (size_max == 1) {
         *max = clear(*max);
@@ -108,42 +108,62 @@ int solve(int arr[], int N, struct node **max) {
     return size_max;
 }
 
+/* Выводим ответ */
+void print_answer(size_t max_len, struct node **answer) {
+    printf("%lu\n", max_len);
+    while (!empty(*answer)) {
+        int element = 0;
+        *answer = pop(*answer, &element);
+        printf("%d ", element);
+    }
+}
+
+/* Получаем входные данные */
+int *get_data(size_t *N) {
+    int input;
+    int element;
+    input = scanf("%d", &element);
+    if (element <= 0 || !input) {
+        return NULL;
+    }
+    *N = element;
+
+    int *arr = (int *) malloc((*N) * sizeof(int));
+    for (int i = 0; i < (*N); i++) {
+        input = scanf("%d", &arr[i]);
+        if (!input) {
+            free(arr);
+            return NULL;
+        }
+    }
+    return arr;
+}
+
+void mem_free(struct node **answer, int **arr) {
+    free(*answer);
+    free(*arr);
+}
 
 int main() {
-    int N = 0, max_len, input;
+    size_t N = 0;
 
-    input = scanf("%d", &N);
-    if (N < 0 || !input) {
+    /* Получаем входные данные */
+    int *arr = get_data(&N);
+    if (!arr) {
         printf("[error]");
         return 0;
     }
-    if (!N) {
-        printf("%d", 0);
-        return 0;
-    }
-
-    int *arr = (int *) malloc(N * sizeof(int));
-    for (int i = 0; i < N; i++) {
-        input = scanf("%d", &arr[i]);
-        if (!input) {
-            printf("[error]");
-            free(arr);
-            return 0;
-        }
-    }
-
 
     struct node *answer = NULL;
-    max_len = solve(arr, N, &answer);
+    size_t max_len = 0;
 
-    printf("%d\n", max_len);
-    while (!empty(answer)) {
-        int element = 0;
-        answer = pop(answer, &element);
-        printf("%d ", element);
-    }
+    /* Получаем размер отрезка max_len и сам отрезок в answer */
+    max_len = find_max_arr(arr, N, &answer);
 
-    free(answer);
-    free(arr);
+    /* Выводим ответ */
+    print_answer(max_len, &answer);
+
+    /* Освобождаем память */
+    mem_free(&answer, &arr);
     return 0;
 }
