@@ -105,6 +105,68 @@ char peek(struct node *head) {
     return head->data;
 }
 
+/* Очередь для сбора больших чисел FIFO */
+struct node_q
+{
+    char data;
+    struct node_q *next;
+};
+typedef struct node_q node_q;
+
+struct queue
+{
+    size_t count;
+    node_q *front;
+    node_q *rear;
+};
+typedef struct queue queue;
+
+/* Инициализируем очередь */
+void initialize(queue *q)
+{
+    q->count = 0;
+    q->front = NULL;
+    q->rear = NULL;
+}
+
+/* Проверка очереди на пустоту */
+int isempty_queue(queue *q)
+{
+    return (q->rear == NULL);
+}
+
+/* Добавляем элемент в очередь */
+void enqueue(queue *q, char value)
+{
+    node_q *tmp;
+    tmp = malloc(sizeof(node_q));
+    tmp->data = value;
+    tmp->next = NULL;
+    if(!isempty_queue(q))
+    {
+        q->rear->next = tmp;
+        q->rear = tmp;
+    }
+    else
+    {
+        q->front = q->rear = tmp;
+    }
+    q->count++;
+}
+
+/* Берем элемент из очереди */
+char dequeue(queue *q)
+{
+    node_q *tmp;
+    char n = q->front->data;
+    tmp = q->front;
+    q->front = q->front->next;
+    q->count--;
+    free(tmp);
+    tmp = NULL;
+    return(n);
+}
+
 /* Получаем приоритет операции, если символ не валидный, то 0 */
 int get_priority(char ch) {
     int result;
@@ -200,7 +262,7 @@ _Bool calc(struct node **operators, struct node_digit **digits) {
 }
 
 /* Чистим память */
-void down(struct node **operators, struct node_digit **digits, char **digit) {
+void down(struct node **operators, struct node_digit **digits, queue **digit) {
     free(*digit);
     *operators = clear(*operators);
     *digits = clear_digit(*digits);
@@ -208,77 +270,15 @@ void down(struct node **operators, struct node_digit **digits, char **digit) {
     free(*operators);
 }
 
-/* Очередь для сбора больших чисел FIFO */
-struct node_q
-{
-    char data;
-    struct node_q *next;
-};
-typedef struct node_q node_q;
-
-struct queue
-{
-    int count;
-    node_q *front;
-    node_q *rear;
-};
-typedef struct queue queue;
-
-void initialize(queue *q)
-{
-    q->count = 0;
-    q->front = NULL;
-    q->rear = NULL;
-}
-
-int isempty_queue(queue *q)
-{
-    return (q->rear == NULL);
-}
-
-void enqueue(queue *q, char value)
-{
-    node_q *tmp;
-    tmp = malloc(sizeof(node_q));
-    tmp->data = value;
-    tmp->next = NULL;
-    if(!isempty_queue(q))
-    {
-        q->rear->next = tmp;
-        q->rear = tmp;
-    }
-    else
-    {
-        q->front = q->rear = tmp;
-    }
-    q->count++;
-}
-
-int dequeue(queue *q)
-{
-    node_q *tmp;
-    char n = q->front->data;
-    tmp = q->front;
-    q->front = q->front->next;
-    q->count--;
-    free(tmp);
-    return(n);
-}
-
-
-
-
-
-int main() {
+double start_calc(_Bool * success) {
     char old_ch=' ';
+    queue * digit = (queue *) malloc(sizeof(queue)); // собираем большие числа тип 12324.43242 по символам
+    initialize(digit);
     char ch, current_operator; // текущий символ строки
     _Bool in_begin = 1;
     int priority = 0, current_priority = 0;
-    size_t MAX = 50;
     struct node *operators = NULL; // стек операторов
     struct node_digit *digits = NULL; // стек чисел
-    char *digit = (char *) malloc(MAX * sizeof(char)+1); // собираем большие числа тип 12324.43242 по символам
-    int idx = 0; // кол-во цифр в числе
 
     do {
         scanf("%c", &ch);
@@ -294,25 +294,23 @@ int main() {
         old_ch = ch;
         /* Собираем большое число тип 12234.4342 */
         if (ch == '.' || (ch >= 48 && ch <= 57)) {
-            if (idx >= MAX) {
-                printf("[error]");
-                return 0;
-            }
-            digit[idx] = ch;
-            idx++;
+            enqueue(digit, ch);
             continue;
         }
         /* Записываем наше собранное большое число в стек чисел */
-        if (idx) {
-            digit[idx] = '\0';
-            double element = atof(digit);
+        if (digit->count) {
+            size_t size_tmp = digit->count;
+            char *tmp = (char *) malloc(size_tmp * sizeof(char)+1);
+            for(int j=0; j < size_tmp;j++) {
+                tmp[j] = dequeue(digit);
+            }
+            tmp[size_tmp] = '\0';
+            double element = atof(tmp);
             digits = push_digit(digits, element);
-            idx = 0;
-            free(digit);
-            digit = NULL;
-            digit = (char *) malloc(MAX * sizeof(char)+1);
+            free(tmp);
+            initialize(digit);
         }
-
+        /* Обрабатываем открывающую скобочку */
         if (empty(operators) || ch == '(') {
             operators = push(operators, ch);
             continue;
@@ -324,7 +322,7 @@ int main() {
             operator = peek(operators);
             while (operator != '(') {
                 if (!calc(&operators, &digits)) {
-                    printf("[error]");
+                    *success = 0;
                     down(&operators, &digits, &digit);
                     return 0;
                 }
@@ -339,7 +337,7 @@ int main() {
             /* вычисляем что осталось в стеке пока операции не закончатся */
             while (!empty(operators)) {
                 if (!calc(&operators, &digits)) {
-                    printf("[error]");
+                    *success = 0;
                     down(&operators, &digits, &digit);
                     return 0;
                 }
@@ -349,10 +347,11 @@ int main() {
         /* Узнаем приоритет текущей операции */
         priority = get_priority(ch);
         if (!priority) {
-            printf("[error]");
+            *success = 0;
             down(&operators, &digits, &digit);
             return 0;
         }
+
         do {
             if (empty(operators)) {
                 operators = push(operators, ch);
@@ -361,7 +360,7 @@ int main() {
             current_operator = peek(operators);
             current_priority = get_priority(current_operator);
             if (!current_priority) {
-                printf("[error]");
+                *success = 0;
                 down(&operators, &digits, &digit);
                 return 0;
             }
@@ -373,18 +372,32 @@ int main() {
                 break;
             } else {
                 if (!calc(&operators, &digits)) {
-                    printf("[error]");
                     down(&operators, &digits, &digit);
+                    *success = 0;
                     return 0;
                 }
             }
         } while (1);
+
     } while (ch != '\n' && ch != '\0' && ch!=EOF);
 
     double result;
     digits = pop_digit(digits, &result);
-    printf("%.2lf", result);
 
     down(&operators, &digits, &digit);
+    return result;
+}
+
+int main() {
+    _Bool success = 1;
+    double result;
+
+    result  = start_calc(&success);
+    if (!success) {
+        printf("[error]");
+        return 0;
+    }
+
+    printf("%.2lf", result);
     return 0;
 }
