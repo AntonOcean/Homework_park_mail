@@ -11,7 +11,7 @@
 
 using namespace std;
 
-void solve(const int *arr_a, const int *arr_b, size_t N, int *maxi, int *maxj) {
+void solve(const int *arr_a, const int *arr_b, size_t N, int &maxi, int &maxj) {
   int max_a = arr_a[0], maxi_current = 0;
   int max = arr_a[0] + arr_b[0];
 
@@ -22,8 +22,8 @@ void solve(const int *arr_a, const int *arr_b, size_t N, int *maxi, int *maxj) {
     }
     if (max < max_a + arr_b[i]) {
       max = max_a + arr_b[i];
-      *maxj = i;
-      *maxi = maxi_current;
+      maxj = i;
+      maxi = maxi_current;
     }
   }
 }
@@ -47,7 +47,7 @@ int main() {
   int *arr_a = get_data(N);
   int *arr_b = get_data(N);
   int maxi = 0, maxj = 0;
-  solve(arr_a, arr_b, N, &maxi, &maxj);
+  solve(arr_a, arr_b, N, maxi, maxj);
   cout << maxi << " " << maxj << endl;
   delete[] arr_a;
   delete[] arr_b;
