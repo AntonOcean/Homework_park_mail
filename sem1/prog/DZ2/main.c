@@ -127,7 +127,7 @@ struct queue {
   size_t count;
   node_q *front;
   node_q *rear;
-} queue_default = {0, NULL, NULL};
+};
 typedef struct queue queue;
 
 /* Инициализируем очередь */
@@ -397,10 +397,7 @@ _Bool calculate(const char *expression, size_t expr_size, double *result) {
 
 char input_char() {
   char c = '\0';
-  int result = 0;
-  do {
-    result = scanf("%c", &c);
-  } while (result != 1);
+  c = getchar();
   return c;
 }
 
@@ -411,7 +408,7 @@ char *input_string(size_t *string_size) {
     size_t capacity;
   } buf = {NULL, 0, 0};
   char c = '\0';
-  while (c = input_char(), c != EOF && c != '\n') {
+  while (c = input_char(), c != EOF && c != '\n' && c!='\0') {
     if (buf.size + 1 >= buf.capacity) {
       size_t new_capacity = !buf.capacity ? 1 : buf.capacity * 2;
       char *tmp = (char *) malloc((new_capacity + 1) * sizeof(char));
